@@ -6,7 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     BOT_TOKEN: str
     SHEETS_TOKEN_FILE: str
-    SHEET_NAME: str
+    SHEET_ID: str
 
     model_config = SettingsConfigDict(env_file='.env')
 
