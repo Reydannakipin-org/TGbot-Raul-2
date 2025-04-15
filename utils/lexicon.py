@@ -14,4 +14,5 @@ YES_NO = {
     'Да': 'yes',
     'Нет': 'no'}
 
+
 # messages_to_user = {}
