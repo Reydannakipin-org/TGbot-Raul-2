@@ -1,23 +1,16 @@
 from aiogram import Router, F
 from aiogram import types
 from aiogram.enums import ChatMemberStatus
-from aiogram.filters import Command
+from aiogram.filters import Command, CommandStart
 
-from keyboards.constans import BUTTON_MENU
 from keyboards.reply_kb import (
-    MenuKeyboard,
-    UserKeyboard,
-    AdminKeyboard,
-    AntonKeyboard,
+    MainMenuRolleKeyboard,
     YesNoKeyboard
 )
 from config import config
 # from utils.google_sheets import get_sheet
 from utils.lexicon import YES_NO
 
-ALLOWED_USERS = [
-    11111111
-]
 
 # TODO:
 #  apscheduler - библиотека планировщика задач с ним можно выставить периодичность создания пары
@@ -39,6 +32,7 @@ ALLOWED_USERS = [
 #     Меньше хардкода
 #
 
+
 class BaseHandler(Router):
     def __init__(self):
         super().__init__()
@@ -56,7 +50,7 @@ class KeyboardHandler(BaseHandler):
         self.setup_handlers()
 
     def setup_handlers(self):
-        self.message_handler(Command("start"), self.start_command_access_rights)
+        self.message_handler(CommandStart(), self.start_command_access_rights)
         self.message_handler(F.text.in_(YES_NO.keys()), self.handle_main_menu_roles)
 
     async def start_command_access_rights(self, message: types.Message):
@@ -77,19 +71,5 @@ class KeyboardHandler(BaseHandler):
         """Хендлер кнопок главного меню, выдающий две клавиатуры в зависимости от роли пользователя"""
         chat_user = await message.bot.get_chat_member(chat_id=config.CHAT_ID, user_id=message.from_user.id)
         role = 'admin' if chat_user.status in [ChatMemberStatus.CREATOR, ChatMemberStatus.ADMINISTRATOR] else 'member'
-        keyboard = AntonKeyboard(role).get_keyboard()
+        keyboard = MainMenuRolleKeyboard(role).get_keyboard()
         await message.answer('меню администратора', reply_markup=keyboard)
-
-
-    async def handle_user(self, message: types.Message):
-        """Обработчик кнопок пользовательского меню"""
-        keyboard = UserKeyboard().get_keyboard()
-        await message.answer("Выберите действие:", reply_markup=keyboard)
-
-    async def handle_admin(self, message: types.Message):
-        """Обработчик кнопок административного меню"""
-        if message.from_user.id not in ALLOWED_USERS:
-            await message.answer("У вас нет прав администратора")
-            return
-        keyboard = AdminKeyboard().get_keyboard()
-        await message.answer("Меню администратора:", reply_markup=keyboard)
