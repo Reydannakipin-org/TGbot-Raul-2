@@ -3,4 +3,5 @@
 venv/
 .idea/
  __pycache__/
+ **/__pychache__/
  *.pyc
