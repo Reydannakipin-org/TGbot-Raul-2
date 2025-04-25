@@ -5,6 +5,8 @@ from daemons.drawdaemon import daemon_loop
 from config import config
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
+
+from handlers.admin_handlers import AdminHandler
 from handlers.main_handlers import KeyboardHandler, FeedBackHandler
 
 
@@ -18,6 +20,7 @@ async def start_bot():
     dp = Dispatcher(bot=bot)
 
     dp.include_router(KeyboardHandler())
+    dp.include_router(AdminHandler())
     dp.include_router(FeedBackHandler())
     logger.info('Запуск Telegram-бота...')
     await dp.start_polling(bot)
