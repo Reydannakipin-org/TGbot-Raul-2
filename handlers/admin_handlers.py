@@ -1,10 +1,15 @@
-from datetime import date, datetime
+from datetime import datetime
 from aiogram import types, F
 from aiogram.fsm.context import FSMContext
-
 from handlers.main_handlers import BaseHandler
 from states.admins import AddUser
-from users.models import Participant, get_session, get_engine, Settings
+from utils.handler_util import (
+    async_add_user,
+    async_delete_user,
+    async_list_users,
+    async_update_frequency,
+    async_set_user_pause,
+)
 
 
 class AdminHandler(BaseHandler):
@@ -28,12 +33,11 @@ class AdminHandler(BaseHandler):
 
     async def add_user_button_handler(self, message: types.Message, state: FSMContext):
         """Обработчик кнопки добавления пользователя"""
-
         await message.reply("Пожалуйста, введи ID пользователя:")
         await state.set_state(AddUser.waiting_for_user_id)
 
     async def process_user_id(self, message: types.Message, state: FSMContext):
-
+        """Обработчик добавления пользователя"""
         try:
             user_id = int(message.text)
             await message.reply("Теперь введи полное имя пользователя:")
@@ -43,32 +47,21 @@ class AdminHandler(BaseHandler):
             await message.reply("Ошибка: ID пользователя должен быть числом. Попробуй снова.")
 
     async def process_full_name(self, message: types.Message, state: FSMContext):
-
-        try:
-            data = await state.get_data()
-            user_id = data['user_id']
-            name = message.text
-
-            engine = get_engine()
-            session = get_session(engine)
-            existing_user = session.query(Participant).filter_by(tg_id=user_id).first()
-            if existing_user:
-                await message.reply("Пользователь с таким ID уже существует")
-                return
-            new_user = Participant(tg_id=user_id, name=name)
-            session.add(new_user)
-            session.commit()
+        data = await state.get_data()
+        user_id = data.get('user_id')
+        name = message.text
+        result = await async_add_user(user_id, name)
+        if result == "exists":
+            await message.reply("Пользователь с таким ID уже существует")
+        elif result == "added":
             await message.reply(
                 f"Пользователь успешно добавлен:\n"
                 f"ID: {user_id}\n"
                 f"Имя: {name}"
             )
-            await state.clear()
-        except Exception as e:
-            await message.reply(f"Произошла ошибка при добавлении пользователя: {str(e)}")
-            await state.clear()
-        finally:
-            session.close()
+        else:
+            await message.reply("Произошла ошибка при добавлении пользователя.")
+        await state.clear()
 
     async def delete_user_button_handler(self, message: types.Message, state: FSMContext):
         """Обработчик кнопки удаления пользователя"""
@@ -78,51 +71,36 @@ class AdminHandler(BaseHandler):
     async def process_delete_user_id(self, message: types.Message, state: FSMContext):
         """Обработчик удаления пользователя"""
         try:
-            user_id = message.text
-            engine = get_engine()
-            session = get_session(engine)
-            user = session.query(Participant).filter_by(tg_id=user_id).first()
-            if user:
-                session.delete(user)
-                session.commit()
-                await message.reply(f"Пользователь с ID {user_id} успешно удален")
-            else:
-                await message.reply("Пользователь с таким ID не найден")
-            await state.clear()
-        except Exception as e:
-            await message.reply(f"Произошла ошибка при удалении пользователя: {str(e)}")
-            await state.clear()
-        finally:
-            session.close()
+            user_id = int(message.text)
+        except ValueError:
+            await message.reply("Ошибка: ID должен быть числом.")
+            return
+        success = await async_delete_user(user_id)
+        if success:
+            await message.reply(f"Пользователь с ID {user_id} успешно удален")
+        else:
+            await message.reply("Пользователь с таким ID не найден")
+        await state.clear()
 
     async def list_users_button_handler(self, message: types.Message):
         """Обработчик кнопки просмотра списка пользователей"""
-        try:
-            engine = get_engine()
-            session = get_session(engine)
-            users = session.query(Participant).all()
-
-            if users:
-                user_list = "\n".join([f"ID: {user.tg_id}, Имя: {user.name}" for user in users])
-                await message.reply(f"Список участников:\n{user_list}")
-            else:
-                await message.reply("Список участников пуст")
-        except Exception as e:
-            await message.reply(f"Произошла ошибка при получении списка пользователей: {str(e)}")
-        finally:
-            session.close()
-
+        users = await async_list_users()
+        if users:
+            user_list = "\n".join([f"ID: {user.tg_id}, Имя: {user.name}" for user in users])
+            await message.reply(f"Список участников:\n{user_list}")
+        else:
+            await message.reply("Список участников пуст")
 
     async def regular_pairing_handler(self, message: types.Message, state: FSMContext):
         """Обработчик кнопки регулярности участия"""
-        await message.reply("Пожалуйста, введи желаемую частоту формирования пар (в неделях, допустимые значения: 1, 2, 3 или 4):")
+        await message.reply(
+            "Пожалуйста, введи желаемую частоту формирования пар (в неделях, допустимые значения: 1, 2, 3 или 4):"
+        )
         await state.set_state(AddUser.waiting_for_frequency)
 
     async def process_pairing_frequency(self, message: types.Message, state: FSMContext):
-        """
-            Обработчик установки желаемой частоты формирования пар (в неделях).
-            Допустимые значения: 1, 2, 3 или 4.
-            """
+        """Обработчик установки желаемой частоты формирования пар (в неделях).
+            Допустимые значения: 1, 2, 3 или 4."""
         try:
             frequency = int(message.text.strip())
         except ValueError:
@@ -131,24 +109,11 @@ class AdminHandler(BaseHandler):
         if frequency not in (1, 2, 3, 4):
             await message.reply("Недопустимое значение. Допустимые значения: 1, 2, 3 или 4.")
             return
-        engine = get_engine()
-        session = get_session(engine)
-        try:
-            settings = session.query(Settings).first()
-            if settings:
-                settings.frequency_in_weeks = frequency
-            else:
-                current_day = date.today().weekday()
-                settings = Settings(day_of_week=current_day, frequency_in_weeks=frequency)
-                session.add(settings)
-            session.commit()
-        except Exception as e:
-            session.rollback()
-            await message.reply(f"Ошибка при сохранении настроек: {e}")
-            return
-        finally:
-            session.close()
-        await message.reply(f"Частота формирования пар успешно установлена: раз в {frequency} неделю(ю).")
+        success = await async_update_frequency(frequency)
+        if success:
+            await message.reply(f"Частота формирования пар успешно установлена: раз в {frequency} неделю(ю).")
+        else:
+            await message.reply("Ошибка при обновлении настроек.")
         await state.clear()
 
     async def pause_user_button_handler(self, message: types.Message, state: FSMContext):
@@ -158,12 +123,11 @@ class AdminHandler(BaseHandler):
 
     async def process_pause_user_id(self, message: types.Message, state: FSMContext):
         """Обработчик приостановки участия пользователя"""
-        tg_id = message.text.strip()
-        if not tg_id.isdigit():
+        tg_id_text = message.text.strip()
+        if not tg_id_text.isdigit():
             await message.reply("ID должен быть числом. Попробуй еще раз:")
             return
-
-        await state.update_data(tg_id=tg_id)
+        await state.update_data(tg_id=int(tg_id_text))
         await message.reply(
             "Теперь введи дату начала приостановки в формате ДД.ММ.ГГГГ:\nНапример, 01.08.2023"
         )
@@ -177,9 +141,7 @@ class AdminHandler(BaseHandler):
         except ValueError:
             await message.reply("Неверный формат даты. Введи дату в формате ДД.ММ.ГГГГ:")
             return
-
         await state.update_data(pause_start=pause_start)
-
         await message.reply(
             "Теперь введи дату окончания приостановки в формате ДД.ММ.ГГГГ:\nНапример, 15.08.2023"
         )
@@ -199,17 +161,9 @@ class AdminHandler(BaseHandler):
         if pause_end < pause_start:
             await message.reply("Дата окончания не может быть меньше даты начала. Попробуй ввести даты заново.")
             return
-        engine = get_engine()
-        session = get_session(engine)
-
-        participant = session.query(Participant).filter_by(tg_id=tg_id).first()
-        if not participant:
+        success = await async_set_user_pause(tg_id, pause_start, pause_end)
+        if success:
+            await message.reply(f"Участник с ID {tg_id} успешно приостановлен с {pause_start} по {pause_end}.")
+        else:
             await message.reply("Участник с таким ID не найден.")
-            await state.clear()
-            return
-        participant.exclude_start = pause_start
-        participant.exclude_end = pause_end
-        session.commit()
-        await message.reply(f"Участник {participant.name} успешно приостановлен с {pause_start} по {pause_end}.")
-
         await state.clear()
