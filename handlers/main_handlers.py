@@ -5,8 +5,6 @@ from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from pathlib import Path
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from keyboards.reply_kb import (
     MainMenuRolleKeyboard,
     FeedBackKeyboard, RegularityKeyboard
@@ -14,7 +12,7 @@ from keyboards.reply_kb import (
 from config import config
 from states.states import FeedBack
 from utils.lexicon import BUTTONS, text
-from utils.handler_util import update_frequency_in_weeks
+from utils.handler_util import async_update_frequency
 
 
 class BaseHandler(Router):
@@ -73,7 +71,6 @@ class  FeedBackHandler(BaseHandler):
         super().__init__()
         self.setup_handlers()
 
-
     def setup_handlers(self):
         self.message_handler(F.text == 'Обратная связь по встрече', self.feedback_first_step)
         self.message_handler(F.text.in_(BUTTONS['first']), self.handle_feed)
@@ -90,12 +87,10 @@ class  FeedBackHandler(BaseHandler):
         self.message_handler(F.text == 'Просмотр уведомлений', self.handle_view_notifications)
         self.message_handler(F.text == 'Выйти из бота', self.handle_exit)
 
-
     async def feedback_first_step(self, message: types.Message):
         await message.answer(
             text=text['feedback_first_step'],
             reply_markup=FeedBackKeyboard(buttons=BUTTONS['first']).get_keyboard())
-
 
     async def handle_feed(self, message: types.Message, state: FSMContext):
         """Хендлер о результате встречи в зависимости от ответа выдает результат"""
@@ -109,7 +104,6 @@ class  FeedBackHandler(BaseHandler):
                 text=text['handle_feed'][1])
             await state.set_state(FeedBack.negative_answer)
 
-
     async def waiting_for_feedback(self, message: types.Message, state: FSMContext):
         """Хендлер для ответа на вопрос о положительном или отрицательном результате встречи"""
         if message.text == BUTTONS['positive'][0]:
@@ -119,7 +113,6 @@ class  FeedBackHandler(BaseHandler):
         else:
             await state.set_state(FeedBack.waiting_for_suggestions)
             await message.answer(text=text['waiting_for_feedback'][1])
-
 
     async def handle_feedback(self, message: types.Message, state: FSMContext):
         """Загружает все отзывы в файл пока что"""
@@ -131,11 +124,9 @@ class  FeedBackHandler(BaseHandler):
         await message.answer(text=text['handle_feedback'],reply_markup=MainMenuRolleKeyboard(role='member').get_keyboard())
         await state.clear()
 
-
     async def handle_ask_for_media(self, message: types.Message):
         """Хендлер для загрузки фото/видео файлов в папку проекта (нужно в бд)"""
         await message.answer(text=text['handle_ask_for_media'])
-
 
     async def handle_media(self, message: types.Message):
         """Хендлер для загрузки фото/видео файлов в папку проекта (нужно в бд)"""
@@ -151,18 +142,16 @@ class  FeedBackHandler(BaseHandler):
     async def handle_regularity(self, message: types.Message):
         await message.answer(text=text['handle_regularity'],reply_markup=RegularityKeyboard().get_keyboard())
 
-
-    async def handle_regular_period(self, message: types.Message, session: AsyncSession):
+    async def handle_regular_period(self, message: types.Message):
         if message.text == BUTTONS['regular'][0]:
-            await update_frequency_in_weeks(session=session,weeks=2)
+            await async_update_frequency(2)
             await message.answer(text='Вы установили 1 раз в 2 недели')
         if message.text == BUTTONS['regular'][1]:
-            await update_frequency_in_weeks(session=session, weeks=3)
+            await async_update_frequency(3)
             await message.answer(text='Вы установили 1 раз в 3 недели')
         if message.text == BUTTONS['regular'][2]:
-            await update_frequency_in_weeks(session=session, weeks=4)
+            await async_update_frequency(4)
             await message.answer(text='Вы установили 1 раз в 4 недели')
-
 
     async def handle_view_notifications(self, message: types.Message):
         await message.answer(text=text['handle_view_notifications'])
@@ -179,21 +168,3 @@ class  FeedBackHandler(BaseHandler):
         #         text=text['handle_exit'][1])
         # else:
         #     await message.answer(text=text['handle_exit'][2],reply_markup=MainMenuRolleKeyboard(role='member').get_keyboard())
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
