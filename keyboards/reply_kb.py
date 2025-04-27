@@ -1,7 +1,7 @@
 from aiogram.types import KeyboardButton
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
 from typing import Union
-from utils.lexicon import menu_buttons,regularity
+from utils.lexicon import MENU_BUTTONS, BUTTONS
 
 
 class ReplyBuilder:
@@ -20,7 +20,7 @@ class MainMenuRolleKeyboard(ReplyBuilder):
     """Инициализирует клавиатуру с кнопками в зависимости от роли."""
 
     def __init__(self, role: Union[str, None]):
-        super().__init__(menu_buttons[role], rows=2)
+        super().__init__(MENU_BUTTONS[role], rows=2)
 
 
 
@@ -30,5 +30,5 @@ class FeedBackKeyboard(ReplyBuilder):
 
 class RegularityKeyboard(ReplyBuilder):
     def __init__(self):
-        super().__init__(regularity['regular'], rows=1)
+        super().__init__(BUTTONS['regular'], rows=1)
 

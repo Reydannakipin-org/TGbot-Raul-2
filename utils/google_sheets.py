@@ -1,13 +1,12 @@
 from gspread import Client
 from config import config
 from oauth2client.service_account import ServiceAccountCredentials
+from utils.lexicon import scopes_urls
 
 
 def get_sheet():
     """Функция для подключения к Google Sheets к config.SHEET_ID"""
-    scopes = [
-        'https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive'
-    ]
+    scopes = scopes_urls
     gc = Client(auth=ServiceAccountCredentials.from_json_keyfile_dict(
         config.serialize_sheet_token_file(), scopes)
     )

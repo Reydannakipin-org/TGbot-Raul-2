@@ -7,4 +7,10 @@ class FeedBack(StatesGroup):
     negative_answer = State()
 
 class ExitBot(StatesGroup):
-    waiting_for_exit = State()
+    exit_bot = State()
+
+
+class Regularity(StatesGroup):
+    two_weeks = State()
+    three_weeks = State()
+    four_weeks = State()
