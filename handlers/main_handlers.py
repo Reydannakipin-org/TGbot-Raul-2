@@ -5,8 +5,6 @@ from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from pathlib import Path
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from keyboards.reply_kb import (
     MainMenuRolleKeyboard,
     FeedBackKeyboard, RegularityKeyboard
@@ -144,7 +142,7 @@ class  FeedBackHandler(BaseHandler):
     async def handle_regularity(self, message: types.Message):
         await message.answer(text=text['handle_regularity'],reply_markup=RegularityKeyboard().get_keyboard())
 
-    async def handle_regular_period(self, message: types.Message, session: AsyncSession):
+    async def handle_regular_period(self, message: types.Message):
         if message.text == BUTTONS['regular'][0]:
             await async_update_frequency(2)
             await message.answer(text='Вы установили 1 раз в 2 недели')
