@@ -12,7 +12,7 @@ class ReplyBuilder:
     def add_buttons(self, buttons):
         for button in buttons:
             self.keyboard.add(KeyboardButton(text=button))
-    def get_keyboard(self,is_one_time: bool = True):
+    def get_keyboard(self, is_one_time: bool = True):
         return self.keyboard.adjust(self.rows).as_markup(resize_keyboard=True, one_time_keyboard=is_one_time)
 
 

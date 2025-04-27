@@ -2,7 +2,7 @@
 from datetime import date
 from sqlalchemy.future import select
 
-from handlers.db import get_async_engine, get_async_sessionmaker
+from database.db import get_async_engine, get_async_sessionmaker
 from users.models import Participant, Settings
 
 
