@@ -4,7 +4,6 @@ from sqlalchemy import (
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
-import random
 
 Base = declarative_base()
 
@@ -15,6 +14,14 @@ def get_session(engine):
     Session = sessionmaker(bind=engine)
     return Session()
 
+class Cycle(Base):
+    __tablename__ = 'cycles'
+
+    id = Column(Integer, primary_key=True)
+    start_date = Column(Date, nullable=False)
+
+    draws = relationship("Draw", back_populates="cycle")
+
 class Participant(Base):
     __tablename__ = 'participants'
 
@@ -22,6 +29,7 @@ class Participant(Base):
     tg_id = Column(String, unique=True, nullable=False)
     name = Column(String, nullable=False)
     admin = Column(Boolean, default=False)
+    frequency_individual = Column(Integer, default=1)
     active = Column(Boolean, default=True)
     exclude_start = Column(Date, nullable=True)
     exclude_end = Column(Date, nullable=True)
@@ -41,7 +49,9 @@ class Draw(Base):
 
     id = Column(Integer, primary_key=True)
     draw_date = Column(Date, nullable=False)
+    cycle_id = Column(Integer, ForeignKey('cycles.id'))
 
+    cycle = relationship("Cycle", back_populates="draws")
     pairs = relationship("Pair", back_populates="draw")
 
 class Pair(Base):
@@ -60,5 +70,5 @@ class Settings(Base):
     __tablename__ = 'settings'
 
     id = Column(Integer, primary_key=True)
-    day_of_week = Column(Integer, nullable=False)  # 0 - Monday, 6 - Sunday
+    day_of_week = Column(Integer, nullable=False)
     frequency_in_weeks = Column(Integer, nullable=False)
