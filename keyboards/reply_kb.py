@@ -23,12 +23,16 @@ class MainMenuRolleKeyboard(ReplyBuilder):
         super().__init__(MENU_BUTTONS[role], rows=2)
 
 
-
 class FeedBackKeyboard(ReplyBuilder):
     def __init__(self, buttons: Union[list[str],str]):
         super().__init__(buttons, rows=2)
+
 
 class RegularityKeyboard(ReplyBuilder):
     def __init__(self):
         super().__init__(BUTTONS['regular'], rows=1)
 
+
+class ExitKeyboard(ReplyBuilder):
+    def __init__(self, buttons: Union[list[str],str]):
+        super().__init__(buttons, rows=2)
