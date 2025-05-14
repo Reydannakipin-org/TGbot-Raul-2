@@ -12,8 +12,11 @@ from aiogram import Bot
 from aiogram.types import ChatMember
 from aiogram.exceptions import TelegramBadRequest
 
-from users.models import get_session, get_engine, Draw, Pair, Settings, Participant, Cycle
-
+from users.models import (
+    get_session, get_engine,
+    Draw, Pair, Settings,
+    Participant, Cycle
+)
 
 load_dotenv()
 
@@ -133,7 +136,6 @@ async def perform_draw(bot: Bot, session, draw_date):
 
     return save_draw(session, draw_date, current_cycle, pairs), pairs
 
-from datetime import datetime, timedelta
 
 async def daemon_loop(bot: Bot):
     global should_run
@@ -151,7 +153,9 @@ async def daemon_loop(bot: Bot):
             settings = session.query(Settings).first()
             if settings:
                 now = datetime.now()
-                last_draw = session.query(Draw).order_by(Draw.draw_date.desc()).first()
+                last_draw = session.query(
+                    Draw
+                ).order_by(Draw.draw_date.desc()).first()
 
                 need_draw = False
 
@@ -165,26 +169,40 @@ async def daemon_loop(bot: Bot):
                 # --- ОРИГИНАЛЬНАЯ ЛОГИКА ПО ДНЯМ И НЕДЕЛЯМ ---
                 # if not last_draw:
                 #     need_draw = True
-                # elif now.date() >= last_draw.draw_date + timedelta(weeks=settings.frequency_in_weeks):
+                # elif now.date() >= last_draw.draw_date +
+                # timedelta(weeks=settings.frequency_in_weeks):
                 #     need_draw = True
 
                 # if now.weekday() == settings.day_of_week and need_draw:
                 if need_draw:
-                    logger.info("Проходит жеребьёвка (тестовый режим: каждые 3 минуты)")
-                    draw, pairs = await perform_draw(bot, session, datetime.now())
+                    logger.info(
+                        "Проходит жеребьёвка (тестовый режим: каждые 10 минут)"
+                    )
+                    draw, pairs = await perform_draw(bot,
+                                                     session,
+                                                     datetime.now())
                     if pairs:
                         for p1, p2 in pairs:
                             try:
-                                await bot.send_message(int(p1.tg_id), f"Ваша пара на сегодня: {p2.name}")
-                                await bot.send_message(int(p2.tg_id), f"Ваша пара на сегодня: {p1.name}")
+                                await bot.send_message(
+                                    int(p1.tg_id),
+                                    f"Ваша пара на сегодня: {p2.name}"
+                                )
+                                await bot.send_message(
+                                    int(p2.tg_id),
+                                    f"Ваша пара на сегодня: {p1.name}"
+                                )
                             except Exception as e:
-                                logger.warning(f"Не удалось отправить сообщение участнику: {e}")
+                                logger.warning(
+                                    f"Не удалось отправить сообщение"
+                                    f" участнику: {e}"
+                                )
 
         finally:
             session.close()
 
         await asyncio.sleep(30)  # Проверяем каждые 30 секунд (можно и чаще)
-    
+
     logger.info('Демон жеребьёвки остановлен.')
 
 
@@ -198,6 +216,7 @@ def init_db():
     else:
         print("Настройки уже существуют.")
     session.close()
+
 
 if __name__ == '__main__':
     init_db()
