@@ -41,6 +41,10 @@ class Participant(Base):
     active = Column(Boolean, default=True)
     exclude_start = Column(Date, nullable=True)
     exclude_end = Column(Date, nullable=True)
+    added_at = Column(DateTime,
+                      default=datetime.utcnow,
+                      nullable=False)  
+
 
     feedbacks = relationship("Feedback",
                              back_populates="participant",
@@ -80,10 +84,13 @@ class Pair(Base):
     draw_id = Column(Integer, ForeignKey('draws.id'))
     participant1_id = Column(Integer, ForeignKey('participants.id'))
     participant2_id = Column(Integer, ForeignKey('participants.id'))
+    participant3_id = Column(Integer, ForeignKey('participants.id'), nullable=True)
 
     draw = relationship("Draw", back_populates="pairs")
     participant1 = relationship("Participant", foreign_keys=[participant1_id])
     participant2 = relationship("Participant", foreign_keys=[participant2_id])
+    participant3 = relationship("Participant", foreign_keys=[participant3_id])
+
 
 
 class Settings(Base):

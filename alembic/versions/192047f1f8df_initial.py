@@ -1,8 +1,8 @@
-"""init
+"""Initial
 
-Revision ID: 1e75579a467b
+Revision ID: 192047f1f8df
 Revises: 
-Create Date: 2025-05-14 02:04:53.862490
+Create Date: 2025-05-15 11:30:08.590016
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '1e75579a467b'
+revision: str = '192047f1f8df'
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -35,6 +35,7 @@ def upgrade() -> None:
     sa.Column('active', sa.Boolean(), nullable=True),
     sa.Column('exclude_start', sa.Date(), nullable=True),
     sa.Column('exclude_end', sa.Date(), nullable=True),
+    sa.Column('added_at', sa.DateTime(), nullable=False),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('tg_id')
     )
@@ -76,9 +77,11 @@ def upgrade() -> None:
     sa.Column('draw_id', sa.Integer(), nullable=True),
     sa.Column('participant1_id', sa.Integer(), nullable=True),
     sa.Column('participant2_id', sa.Integer(), nullable=True),
+    sa.Column('participant3_id', sa.Integer(), nullable=True),
     sa.ForeignKeyConstraint(['draw_id'], ['draws.id'], ),
     sa.ForeignKeyConstraint(['participant1_id'], ['participants.id'], ),
     sa.ForeignKeyConstraint(['participant2_id'], ['participants.id'], ),
+    sa.ForeignKeyConstraint(['participant3_id'], ['participants.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     # ### end Alembic commands ###
