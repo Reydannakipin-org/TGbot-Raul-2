@@ -7,7 +7,7 @@ from aiogram.enums import ParseMode
 from config import config
 from daemons.drawdaemon import daemon_loop, init_db
 from handlers.admin_handlers import AdminHandler
-from handlers.main_handlers import MainHandler, FeedBackHandler
+from handlers.main_handlers__old import MainHandler, FeedBackHandler
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -25,7 +25,7 @@ async def start_bot(bot: Bot):
 
 async def main():
     logger.info('Запуск основного приложения...')
-    init_db()
+    await init_db()
     bot = Bot(token=config.BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 
     await asyncio.gather(

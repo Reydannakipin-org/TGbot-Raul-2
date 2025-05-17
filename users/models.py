@@ -1,24 +1,28 @@
-from datetime import date
+from datetime import date, datetime
 from sqlalchemy import (
-    create_engine,
     Boolean, Column,
     Date, DateTime,
     Integer, String, ForeignKey
 )
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, sessionmaker
-from datetime import datetime
+from sqlalchemy.orm import DeclarativeBase, relationship
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 
-Base = declarative_base()
+
+class Base(DeclarativeBase):
+    pass
 
 
 def get_engine():
-    return create_engine('sqlite:///random_coffee.db')
+    return create_async_engine('sqlite+aiosqlite:///random_coffee.db',
+                               echo=False)
 
 
 def get_session(engine):
-    Session = sessionmaker(bind=engine)
-    return Session()
+    return async_sessionmaker(
+        bind=engine,
+        class_=AsyncSession,
+        expire_on_commit=False
+    )()
 
 
 class Cycle(Base):
@@ -42,7 +46,7 @@ class Participant(Base):
     exclude_start = Column(Date, nullable=True)
     exclude_end = Column(Date, nullable=True)
     added_at = Column(DateTime,
-                      default=datetime.utcnow,
+                      default=datetime.now,
                       nullable=False)  
 
 
@@ -68,7 +72,7 @@ class Draw(Base):
     __tablename__ = 'draws'
 
     id = Column(Integer, primary_key=True)
-    draw_date = Column(DateTime, nullable=False, default=datetime.utcnow)
+    draw_date = Column(DateTime, nullable=False, default=datetime.now)
     cycle_id = Column(Integer, ForeignKey('cycles.id'))
 
     cycle = relationship("Cycle", back_populates="draws")

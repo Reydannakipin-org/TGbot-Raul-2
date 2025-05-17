@@ -1,5 +1,6 @@
 import os
 import asyncio
+import collections
 import signal
 import logging
 import random
@@ -7,13 +8,15 @@ from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from typing import Union
 
-
 from aiogram import Bot
 from aiogram.types import ChatMember
 from aiogram.exceptions import TelegramBadRequest
 
+from sqlalchemy import select, func
+from sqlalchemy.ext.asyncio import async_sessionmaker
+
 from users.models import (
-    get_session, get_engine,
+    get_engine,
     Draw, Pair, Settings,
     Participant, Cycle
 )
@@ -29,6 +32,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 should_run = True
+engine = get_engine()
 
 
 def handle_shutdown():
@@ -38,127 +42,150 @@ def handle_shutdown():
 
 
 def match_pairs(participants, previous_pairs):
-    random.shuffle(participants)
-    available = participants[:]
+    import collections
 
+    id_map = {p.id: p for p in participants}
+    ids = list(id_map.keys())
+    random.shuffle(ids)
+
+    used = set((min(a, b), max(a, b)) for a, b in previous_pairs)
+
+    neighbors = collections.defaultdict(set)
+    for i in range(len(ids)):
+        for j in range(i + 1, len(ids)):
+            a, b = ids[i], ids[j]
+            if (min(a, b), max(a, b)) not in used:
+                neighbors[a].add(b)
+                neighbors[b].add(a)
+
+    unmatched = set(ids)
     pairs = []
-    used_ids = set()
 
-    while len(available) >= 2:
-        p1 = available.pop(0)
-        p2_candidates = [
-            p for p in available
-            if (
-                p.id, p1.id
-            ) not in previous_pairs and (p1.id, p.id) not in previous_pairs
-        ]
-        if not p2_candidates:
-            available.insert(0, p1)
-            break
-
-        p2 = random.choice(p2_candidates)
-        available.remove(p2)
-        pairs.append([p1, p2])
-        used_ids.add(p1.id)
-        used_ids.add(p2.id)
-
-    while available and pairs:
-        extra = available.pop()
-        candidates = [pair for pair in pairs if len(pair) < 3]
+    while unmatched:
+        a = unmatched.pop()
+        candidates = neighbors[a] & unmatched
         if not candidates:
-            logger.info(
-                f"Участник {extra.name} остался без пары."
-            )
-            break
-        chosen_pair = random.choice(candidates)
-        chosen_pair.append(extra)
-        logger.info(f"Участник {extra.name} добавлен третьим в пару.")
+            continue
+        b = random.choice(list(candidates))
+        unmatched.remove(b)
+        pairs.append([id_map[a], id_map[b]])
 
-    for lone in available:
-        logger.info(
-            f"Недостаточно участников для пары — {lone.name} остался без пары."
-        )
+    leftovers = [id_map[i] for i in unmatched]
+    for lone in leftovers:
+        candidates = [pair for pair in pairs if len(pair) < 3]
+        if candidates:
+            random.choice(candidates).append(lone)
+            logger.info(f"Участник {lone.name} добавлен третьим в пару.")
+        else:
+            logger.info(f"Участник {lone.name} остался без пары.")
 
     return pairs
 
 
-def get_or_create_cycle(session):
-    participants = session.query(Participant).filter_by(active=True).all()
-    total_possible = len(participants) * (len(participants) - 1) // 2
+async def get_or_create_cycle(session, actual_participants):
+    total_possible = len(actual_participants) * (len(actual_participants) - 1) // 2
 
-    previous_pairs = session.query(Pair).join(Draw).join(Cycle).order_by(
-        Cycle.start_date.desc()
-    ).all()
+    if total_possible == 0:
+        return None
+    result = await session.execute(
+        select(Pair).join(Draw).join(Cycle).order_by(Cycle.start_date.desc())
+    )
+    previous_pairs = result.scalars().all()
+
     unique_pairs = set()
+    actual_ids = set(p.id for p in actual_participants)
     for pair in previous_pairs:
-        unique_pairs.add(tuple(sorted((pair.participant1_id,
-                                       pair.participant2_id))))
+        ids = [pair.participant1_id, pair.participant2_id]
+        if pair.participant3_id:
+            ids.append(pair.participant3_id)
+        filtered_ids = [i for i in ids if i in actual_ids]
+        for i in range(len(filtered_ids)):
+            for j in range(i + 1, len(filtered_ids)):
+                unique_pairs.add(tuple(sorted((filtered_ids[i], filtered_ids[j]))))
 
-    if total_possible == 0 or len(unique_pairs) / total_possible >= 0.75:
-        logger.info(
-            "75% пар реализовано — создаём новый цикл жеребьёвки."
-        )
+    if len(unique_pairs) / total_possible >= 0.75:
+        logger.info("75% возможных пар среди текущих участников реализовано — создаём новый цикл жеребьёвки.")
         new_cycle = Cycle(start_date=datetime.now().date())
         session.add(new_cycle)
-        session.commit()
-        return new_cycle
-
-    current_cycle = session.query(Cycle).order_by(
-        Cycle.start_date.desc()
-    ).first()
+        await session.commit()
+        return new_cycle 
+    
+    result = await session.execute(select(Cycle).order_by(Cycle.start_date.desc()))
+    current_cycle = result.scalars().first()
     if not current_cycle:
         current_cycle = Cycle(start_date=datetime.now().date())
         session.add(current_cycle)
-        session.commit()
+        await session.commit()
 
     return current_cycle
 
-
-async def is_user_in_chat(bot: Bot,
-                          chat_id: Union[int, str],
-                          user_id: int) -> bool:
+async def is_user_in_chat(bot: Bot, chat_id: Union[int, str], user_id: int) -> bool:
     try:
         member: ChatMember = await bot.get_chat_member(chat_id, user_id)
-        return member.status in ("member", "administrator", "creator")
+        return member.status in ('member', 'administrator', 'creator')
     except TelegramBadRequest:
         return False
 
 
 async def get_actual_participants(bot: Bot, session, chat_id: Union[int, str]):
-    participants = session.query(Participant).filter_by(active=True,
-                                                        admin=False).all()
-    actual = []
     today = datetime.now().date()
-    
+    now = datetime.now()
+    participants = (await session.execute(
+        select(Participant).where(Participant.active == True, Participant.admin == False)
+    )).scalars().all()
+
+    actual = []
+
     for p in participants:
         if await is_user_in_chat(bot, chat_id, p.tg_id):
+            result = await session.execute(
+                select(Draw.draw_date).join(Pair).filter(
+                    (Pair.participant1_id == p.id) |
+                    (Pair.participant2_id == p.id) |
+                    (Pair.participant3_id == p.id)
+                ).order_by(Draw.draw_date.desc()).limit(1)
+            )
+            last_draw_date = result.first()
+            if last_draw_date:
+                weeks_passed = (today - last_draw_date[0]).days // 7
+                #weeks_passed = (now - last_draw_date[0]).total_seconds() // 60 # 60 сек тестовый режим
+                if weeks_passed < p.frequency_individual*2:
+                    logger.info(
+                        f'Участник {p.name} пропускает жеребьёвку — прошло '
+                        f'{weeks_passed} недель из {p.frequency_individual}.'
+                    )
+                    continue
             actual.append(p)
         else:
-            logger.info(f"Пользователь {p.name} (id={p.tg_id})"
-                        "больше не в чате — исключён из жеребьёвки.")
+            logger.info(f'Пользователь {p.name} (id={p.tg_id}) больше не в чате — исключён.')
             p.active = False
-        last_draw_date = session.query(Draw.draw_date).join(Pair).filter(
-            (Pair.participant1_id == p.id) |
-            (Pair.participant2_id == p.id) |
-            (Pair.participant3_id == p.id)
-        ).order_by(Draw.draw_date.desc()).first()
-        if last_draw_date:
-            weeks_passed = (today - last_draw_date[0]).days // 7
-            if weeks_passed < p.frequency_individual:
-                logger.info(
-                    f"Участник {p.name} пропускает жеребьёвку — прошло "
-                    f"{weeks_passed} недель из необходимых {p.frequency_individual}."
-                )
-                continue
 
-    session.commit()
+    await session.commit()
     return actual
 
+async def refresh_participants_status(bot: Bot, session, chat_id: Union[int, str]):
+    participants = (await session.execute(
+        select(Participant).where(Participant.active == True)
+    )).scalars().all()
 
-def save_draw(session, draw_date, current_cycle, pairs):
+    for p in participants:
+        try:
+            in_chat = await is_user_in_chat(bot, chat_id, p.tg_id)
+        except Exception as e:
+            logger.warning(f'Не удалось проверить участника {p.name} (id={p.tg_id}): {e}')
+            continue
+
+        if not in_chat:
+            p.active = False
+            logger.info(f'Пользователь {p.name} (id={p.tg_id}) больше не в чате — деактивирован.')
+
+    await session.commit()
+
+
+async def save_draw(session, draw_date, current_cycle, pairs):
     draw = Draw(draw_date=draw_date, cycle_id=current_cycle.id)
     session.add(draw)
-    session.flush()
+    await session.flush()
 
     for pair_tuple in pairs:
         p1 = pair_tuple[0]
@@ -172,7 +199,7 @@ def save_draw(session, draw_date, current_cycle, pairs):
         )
         session.add(pair)
 
-    session.commit()
+    await session.commit()
     logger.info(
         f'Жеребьёвка на {draw_date} завершена. Сформировано пар: {len(pairs)}.'
     )
@@ -180,33 +207,47 @@ def save_draw(session, draw_date, current_cycle, pairs):
 
 
 async def perform_draw(bot: Bot, session, draw_date):
-    if session.query(Draw).filter_by(draw_date=draw_date).first():
+    # Проверка существующей жеребьёвки закомментировать для теста
+    existing = await session.execute(select(Draw).filter_by(draw_date=draw_date))
+    if existing.scalars().first():
         logger.info(f'Жеребьёвка на дату {draw_date} уже проведена.')
         return None, []
-
+    try:
+        await refresh_participants_status(bot, session, CHAT_ID)
+    except Exception as e:
+        logger.warning(f'Ошибка при проверке участников в чате: {e}')
     participants = await get_actual_participants(bot, session, CHAT_ID)
     if len(participants) < 2:
         logger.info('Недостаточно участников для жеребьёвки.')
         return None, []
 
-    current_cycle = get_or_create_cycle(session)
-    previous_pairs = session.query(Pair).join(Draw).filter(
-        Draw.cycle_id == current_cycle.id
-    ).all()
-    previous_set = {(
-        p.participant1_id, p.participant2_id
-    ) for p in previous_pairs}
-    previous_set |= {(
-        p.participant2_id, p.participant1_id
-    ) for p in previous_pairs}
+    current_cycle = await get_or_create_cycle(session, participants)
+
+
+    result = await session.execute(
+        select(Pair).join(Draw).filter(Draw.cycle_id == current_cycle.id)
+    )
+    previous_pairs = result.scalars().all()
+
+    previous_set = set()
+    for p in previous_pairs:
+        previous_set.add((p.participant1_id, p.participant2_id))
+        previous_set.add((p.participant2_id, p.participant1_id))
 
     pairs = match_pairs(participants, previous_set)
 
     if not pairs:
-        logger.info('Нет новых возможных пар для жеребьёвки.')
-        return None, []
+        logger.info('Нет новых возможных пар. Пробуем fallback жеребьёвку.')
+        fallback_pairs = match_pairs(participants, previous_set=set())
+        if fallback_pairs:
+            logger.info('Fallback жеребьёвка сработала.')
+            return await save_draw(session, draw_date, current_cycle, fallback_pairs), fallback_pairs
+        else:
+            logger.info('Даже fallback не дал результата — участников слишком мало.')
+            return None, []
 
-    return save_draw(session, draw_date, current_cycle, pairs), pairs
+
+    return await save_draw(session, draw_date, current_cycle, pairs), pairs
 
 
 async def daemon_loop(bot: Bot):
@@ -217,74 +258,66 @@ async def daemon_loop(bot: Bot):
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, handle_shutdown)
 
-    engine = get_engine()
+    async_session = async_sessionmaker(bind=engine, expire_on_commit=False)
 
     while should_run:
-        session = get_session(engine)
-        try:
-            settings = session.query(Settings).first()
-            if settings:
+        async with async_session() as session:
+            try:
+                result = await session.execute(select(Settings))
+                settings = result.scalars().first()
+                if not settings:
+                    await asyncio.sleep(1800)
+                    continue
+
                 now = datetime.now()
-                last_draw = session.query(
-                    Draw
-                ).order_by(Draw.draw_date.desc()).first()
+                logger.info(f'сейчас {now}')
 
+                last_draw = (await session.execute(
+                    select(Draw).order_by(Draw.draw_date.desc()).limit(1)
+                )).scalars().first()
                 need_draw = False
-
                 if not last_draw:
                     need_draw = True
-                elif now.date() >= last_draw.draw_date + timedelta(
-                    weeks=settings.frequency_in_weeks
-                ):
-                    need_draw = True
+                elif now >= last_draw.draw_date + timedelta(weeks=settings.frequency_in_weeks):
+#                elif now >= last_draw.draw_date + timedelta(minutes=settings.frequency_in_weeks*2):
+ 
+                   need_draw = True
 
-                if now.weekday() == settings.day_of_week and need_draw:
-                    logger.info(
-                        "Проходит жеребьёвка"
-                    )
-                    draw, pairs = await perform_draw(bot,
-                                                     session,
-                                                     datetime.now())
+                if  need_draw and now.weekday() == settings.day_of_week:
+                    logger.info('Проходит жеребьёвка')
+                    draw, pairs = await perform_draw(bot, session, now)
                     if pairs:
                         for pair in pairs:
                             p1, p2 = pair[0], pair[1]
                             p3 = pair[2] if len(pair) > 2 else None
-                            names = [p1.name, p2.name] + (
-                                [p3.name] if p3 else []
-                            )
-                            msg = (
-                                "Ваша группа для ближайцшей встречи: "
-                                + ", ".join(names)
-                            )
+                            names = [p1.name, p2.name] + ([p3.name] if p3 else [])
+                            msg = 'Ваша группа для ближайшей встречи: ' + ', '.join(names)
 
                             for p in [p1, p2] + ([p3] if p3 else []):
                                 try:
                                     await bot.send_message(int(p.tg_id), msg)
                                 except Exception as e:
-                                    logger.warning(
-                                        "Не удалось отправить"
-                                        f"сообщение участнику: {e}"
-                                        )
+                                    logger.warning(f'Не удалось отправить сообщение: {e}')
 
-        finally:
-            session.close()
+            except Exception as e:
+                logger.error(f'Ошибка в демоне жеребьёвки: {e}')
 
-        await asyncio.sleep(1800)
+        await asyncio.sleep(60)
 
     logger.info('Демон жеребьёвки остановлен.')
 
 
-def init_db():
-    session = get_session(get_engine())
-    if session.query(Settings).first() is None:
-        settings = Settings(day_of_week=2, frequency_in_weeks=2)
-        session.add(settings)
-        session.commit()
-        print("Настройки созданы: понедельник, раз в 2 недели.")
-    else:
-        print("Настройки уже существуют.")
-    session.close()
+async def init_db():
+    async with async_sessionmaker(bind=engine, expire_on_commit=False)() as session:
+        result = await session.execute(select(Settings))
+        if not result.scalars().first():
+            settings = Settings(day_of_week=2, frequency_in_weeks=2)
+            session.add(settings)
+            await session.commit()
+            logger.info('Настройки созданы: вторник, раз в 2 недели.')
+        else:
+            logger.info('Настройки уже существуют.')
 
 
 if __name__ == '__main__':
-    init_db()
+    asyncio.run(init_db())

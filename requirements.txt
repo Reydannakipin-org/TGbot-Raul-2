@@ -4,7 +4,8 @@ aiosqlite==0.20.0
 aiohappyeyeballs==2.6.1
 aiohttp==3.11.16
 aiosignal==1.3.2
-alembic
+alembic>1.11
+alembic[asyncio]
 annotated-types==0.7.0
 attrs==25.3.0
 cachetools==5.5.2
@@ -13,6 +14,7 @@ charset-normalizer==3.4.1
 frozenlist==1.5.0
 google-auth==2.38.0
 google-auth-oauthlib==1.2.1
+greenlet>3.0
 gspread==6.2.0
 httplib2==0.22.0
 idna==3.10
@@ -33,7 +35,7 @@ requests==2.32.3
 requests-oauthlib==2.0.0
 rsa==4.9
 six==1.17.0
-sqlalchemy>=1.4
+sqlalchemy>=2.0
 typing_extensions==4.13.1
 urllib3==2.3.0
 yarl==1.18.3
