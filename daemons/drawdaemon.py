@@ -283,7 +283,9 @@ async def daemon_loop(bot: Bot):
  
                    need_draw = True
 
-                if  need_draw and now.weekday() == settings.day_of_week:
+                if (need_draw and 
+                    now.weekday() == settings.day_of_week and 
+                    12 <= now.hour < 14):
                     logger.info('Проходит жеребьёвка')
                     draw, pairs = await perform_draw(bot, session, now)
                     if pairs:
@@ -314,7 +316,7 @@ async def init_db():
             settings = Settings(day_of_week=2, frequency_in_weeks=2)
             session.add(settings)
             await session.commit()
-            logger.info('Настройки созданы: вторник, раз в 2 недели.')
+            logger.info('Настройки созданы: среду, раз в 2 недели.')
         else:
             logger.info('Настройки уже существуют.')
 
