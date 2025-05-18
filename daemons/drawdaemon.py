@@ -312,13 +312,20 @@ async def daemon_loop(bot: Bot):
 async def init_db():
     async with async_sessionmaker(bind=engine, expire_on_commit=False)() as session:
         result = await session.execute(select(Settings))
-        if not result.scalars().first():
+        settings = result.scalars().first()
+
+        if not settings:
             settings = Settings(day_of_week=2, frequency_in_weeks=2)
             session.add(settings)
             await session.commit()
             logger.info('Настройки созданы: среду, раз в 2 недели.')
         else:
-            logger.info('Настройки уже существуют.')
+            if settings.day_of_week != 0:
+                settings.day_of_week = 0
+                await session.commit()
+                logger.info('День недели обновлён на понедельник.')
+            else:
+                logger.info('Настройки уже существуют и день недели — понедельник.')
 
 
 if __name__ == '__main__':
