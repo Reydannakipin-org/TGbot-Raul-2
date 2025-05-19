@@ -1,6 +1,9 @@
+import os
 from datetime import datetime
 from aiogram import types, F
 from aiogram.fsm.context import FSMContext
+from aiogram.types import FSInputFile
+from dotenv import load_dotenv
 from handlers.main_handlers import BaseHandler
 from states.admins import AddUser
 from utils.handler_util import (
@@ -10,6 +13,11 @@ from utils.handler_util import (
     async_update_frequency,
     async_set_user_pause,
 )
+from utils.report import generate_report_file
+
+load_dotenv()
+
+REPORTS_DIR = "reports"
 
 
 class AdminHandler(BaseHandler):
@@ -27,6 +35,8 @@ class AdminHandler(BaseHandler):
         self.message_handler(F.text == 'Общ регулярность участия', self.regular_pairing_handler)
         self.state_handler(AddUser.waiting_for_frequency, self.process_pairing_frequency)
         self.message_handler(F.text == 'Приостановить участие', self.pause_user_button_handler)
+        self.message_handler(F.text == 'Выгрузить отчет', self.export_report_handler)
+        self.message_handler(F.text == 'Выгрузить отчет', self.export_report_handler)
         self.state_handler(AddUser.waiting_for_pause_user_id, self.process_pause_user_id)
         self.state_handler(AddUser.waiting_for_pause_start_date, self.process_pause_start_date)
         self.state_handler(AddUser.waiting_for_pause_end_date, self.process_pause_end_date)
@@ -67,6 +77,23 @@ class AdminHandler(BaseHandler):
         """Обработчик кнопки удаления пользователя"""
         await message.reply("Пожалуйста, введи ID пользователя для удаления:")
         await state.set_state(AddUser.waiting_for_delete_user_id)
+
+    async def export_report_handler(self, message: types.Message):
+        """Обработчик кнопки 'Выгрузить отчет' — вызывает генератор Excel и отправляет файл"""
+
+        try:
+            stream = await generate_report_file()
+            os.makedirs(REPORTS_DIR, exist_ok=True)
+            now_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            filename = f"random_coffee_report_{now_str}.xlsx"
+            filepath = os.path.join(REPORTS_DIR, filename)
+            with open(filepath, "wb") as f:
+                f.write(stream.read())
+            file_to_send = FSInputFile(path=filepath)
+            await message.answer_document(file_to_send, caption="Вот отчет по жеребьевкам")
+
+        except Exception as e:
+            await message.reply(f"Произошла ошибка при формировании отчета: {e}")
 
     async def process_delete_user_id(self, message: types.Message, state: FSMContext):
         """Обработчик удаления пользователя"""

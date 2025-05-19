@@ -13,7 +13,9 @@ certifi==2025.1.31
 charset-normalizer==3.4.1
 frozenlist==1.5.0
 google-auth==2.38.0
+google-auth-httplib2
 google-auth-oauthlib==1.2.1
+google-api-python-client
 greenlet>3.0
 gspread==6.2.0
 httplib2==0.22.0
@@ -22,6 +24,7 @@ magic-filter==1.0.12
 multidict==6.3.2
 oauth2client==4.1.3
 oauthlib==3.2.2
+openpyxl
 pip==25.0.1
 propcache==0.3.1
 pyasn1==0.6.1
@@ -39,5 +42,3 @@ sqlalchemy>=2.0
 typing_extensions==4.13.1
 urllib3==2.3.0
 yarl==1.18.3
-
-

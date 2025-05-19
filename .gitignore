@@ -146,3 +146,10 @@ dmypy.json
 .history/
 
 .mypy_cache
+
+#exel reports
+
+*.xlsx
+
+#keys 
+drive_keys.json

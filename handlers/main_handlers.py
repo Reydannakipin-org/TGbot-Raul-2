@@ -1,3 +1,4 @@
+import os, html
 from aiogram import Router, F, types
 from aiogram.enums import ChatMemberStatus
 from aiogram.filters import CommandStart
@@ -13,6 +14,8 @@ from datetime import datetime
 from config import config
 from states.states import FeedBack
 from utils.lexicon import BUTTONS, text
+from utils.gdrive_utils import upload_file_to_drive
+
 from users.models import (
     Participant, get_engine, get_session,
     Picture, Pair, Draw, Feedback
@@ -307,6 +310,8 @@ class FeedBackHandler(BaseHandler):
         photo = message.photo[-1]
         file_id = photo.file_id
         file = await message.bot.get_file(file_id)
+        filename = file.file_path.split("/")[-1]
+
         file_path = Path('media/photos')
         file_path.mkdir(parents=True, exist_ok=True)
         full_path = file_path / file.file_path.split("/")[-1]
@@ -326,6 +331,19 @@ class FeedBackHandler(BaseHandler):
                 )
                 session.add(new_picture)
                 await session.commit()
+
+        try:
+            folder_id = os.getenv("GOOGLE_DRIVE_FOLDER_ID")
+            gdrive_file_id = upload_file_to_drive(
+                filepath=str(full_path),
+                filename=filename,
+                mimetype='image/jpeg',
+                folder_id=folder_id
+            )
+            drive_link = f"https://drive.google.com/file/d/{gdrive_file_id}/view"
+            await message.answer(f"Файл загружен локально и на Google Drive:\n{drive_link}")
+        except Exception as e:
+            await message.answer(f"Файл сохранён локально, но не удалось загрузить на Google Drive.\nОшибка: {html.escape(str(e))}")
 
         await message.answer(
             text=text['handle_media'],

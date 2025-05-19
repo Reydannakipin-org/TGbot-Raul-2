@@ -9,6 +9,10 @@ class Settings(BaseSettings):
     SHEETS_TOKEN_FILE: str
     SHEET_ID: str
     CHAT_ID: int
+    
+    google_drive_folder_id: str
+    google_drive_scopes: str
+    google_service_account_file: str
 
     model_config = SettingsConfigDict(env_file='.env', env_file_encoding='utf-8')
 
