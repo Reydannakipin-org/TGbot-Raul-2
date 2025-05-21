@@ -4,6 +4,7 @@ from aiogram import types, F
 from aiogram.fsm.context import FSMContext
 from aiogram.types import FSInputFile
 from dotenv import load_dotenv
+
 from handlers.main_handlers import BaseHandler
 from states.admins import AddUser
 from utils.handler_util import (
@@ -113,8 +114,12 @@ class AdminHandler(BaseHandler):
         """Обработчик кнопки просмотра списка пользователей"""
         users = await async_list_users()
         if users:
-            user_list = "\n".join([f"ID: {user.tg_id}, Имя: {user.name}" for user in users])
-            await message.reply(f"Список участников:\n{user_list}")
+            user_lines = []
+            for user in users:
+                status = "Активен" if user.active else "Неактивен"
+                admin_tag = ", админ" if user.admin else ""
+                user_lines.append(f"ID: {user.tg_id}, Имя: {user.name} ({status}{admin_tag})")
+            await message.reply(f"Список участников:\n" + "\n".join(user_lines))
         else:
             await message.reply("Список участников пуст")
 

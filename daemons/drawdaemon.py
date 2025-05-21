@@ -26,10 +26,20 @@ load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHAT_ID = int(os.getenv("CHAT_ID"))
 
-logging.basicConfig(
-    level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s'
-)
+# Логирование в консоль и в файл
+log_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+# Консоль
+console_handler = logging.StreamHandler()
+console_handler.setFormatter(log_formatter)
+logger.addHandler(console_handler)
+
+# Файл
+file_handler = logging.FileHandler('drawdaemon.log', encoding='utf-8')
+file_handler.setFormatter(log_formatter)
+logger.addHandler(file_handler)
 
 should_run = True
 engine = get_engine()
@@ -65,7 +75,8 @@ def match_pairs(participants, previous_pairs):
         a = unmatched.pop()
         candidates = neighbors[a] & unmatched
         if not candidates:
-            continue
+            unmatched.add(a)
+            break 
         b = random.choice(list(candidates))
         unmatched.remove(b)
         pairs.append([id_map[a], id_map[b]])
@@ -147,9 +158,10 @@ async def get_actual_participants(bot: Bot, session, chat_id: Union[int, str]):
             )
             last_draw_date = result.first()
             if last_draw_date:
-                weeks_passed = (today - last_draw_date[0]).days // 7
-                #weeks_passed = (now - last_draw_date[0]).total_seconds() // 60 # 60 сек тестовый режим
-                if weeks_passed < p.frequency_individual*2:
+#                weeks_passed = (today - last_draw_date[0]).days // 7
+                weeks_passed = (now - last_draw_date[0]).total_seconds() // 600 # 300 сек тестовый режим
+                #if weeks_passed < p.frequency_individual:
+                if weeks_passed < p.frequency_individual:
                     logger.info(
                         f'Участник {p.name} пропускает жеребьёвку — прошло '
                         f'{weeks_passed} недель из {p.frequency_individual}.'
@@ -208,10 +220,10 @@ async def save_draw(session, draw_date, current_cycle, pairs):
 
 async def perform_draw(bot: Bot, session, draw_date):
     # Проверка существующей жеребьёвки закомментировать для теста
-    existing = await session.execute(select(Draw).filter_by(draw_date=draw_date))
-    if existing.scalars().first():
-        logger.info(f'Жеребьёвка на дату {draw_date} уже проведена.')
-        return None, []
+#    existing = await session.execute(select(Draw).filter_by(draw_date=draw_date))
+#    if existing.scalars().first():
+#        logger.info(f'Жеребьёвка на дату {draw_date} уже проведена.')
+#        return None, []
     try:
         await refresh_participants_status(bot, session, CHAT_ID)
     except Exception as e:
@@ -278,14 +290,14 @@ async def daemon_loop(bot: Bot):
                 need_draw = False
                 if not last_draw:
                     need_draw = True
-                elif now >= last_draw.draw_date + timedelta(weeks=settings.frequency_in_weeks):
-#                elif now >= last_draw.draw_date + timedelta(minutes=settings.frequency_in_weeks*2):
+#                elif now >= last_draw.draw_date + timedelta(weeks=settings.frequency_in_weeks):
+                elif now >= last_draw.draw_date + timedelta(minutes=settings.frequency_in_weeks*10):
  
                    need_draw = True
 
-                if (need_draw and 
-                    now.weekday() == settings.day_of_week and 
-                    12 <= now.hour < 14):
+                if (need_draw): # and 
+                #    now.weekday() == settings.day_of_week and 
+                #    12 <= now.hour < 14):
                     logger.info('Проходит жеребьёвка')
                     draw, pairs = await perform_draw(bot, session, now)
                     if pairs:

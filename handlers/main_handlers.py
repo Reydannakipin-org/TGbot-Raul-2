@@ -83,7 +83,12 @@ class MainHandler(BaseHandler):
                 select(Participant).filter_by(tg_id=str(user_id))
             )
             participant = result.scalars().first()
-
+            
+            if participant and not participant.active:
+                participant.active = True
+                session.add(participant)
+                await session.commit()
+            
             if not participant:
                 chat_user = await message.bot.get_chat_member(
                     chat_id=config.CHAT_ID, user_id=user_id
@@ -399,7 +404,8 @@ class FeedBackHandler(BaseHandler):
                 .filter(
                     or_(
                         Pair.participant1_id == participant.id,
-                        Pair.participant2_id == participant.id
+                        Pair.participant2_id == participant.id,
+                        Pair.participant3_id == participant.id 
                     )
                 )
                 .order_by(Draw.draw_date.desc())
@@ -407,16 +413,19 @@ class FeedBackHandler(BaseHandler):
             last_pair = result.scalars().first()
 
             if last_pair:
-                if last_pair.participant1_id == participant.id:
-                    partner = last_pair.participant2
-                else:
-                    partner = last_pair.participant1
-
-                if partner:
-                    await message.answer(f"Ваша ближайшая пара: {partner.name}")
+                partner_ids = []
+                partner_ids = [last_pair.participant1_id, last_pair.participant2_id]
+                if hasattr(last_pair, 'participant3_id') and last_pair.participant3_id:
+                    partner_ids.append(last_pair.participant3_id)
+                result = await session.execute(
+                    select(Participant).filter(Participant.id.in_(partner_ids))
+                )
+                participants = result.scalars().all()
+                names = [p.name for p in participants]
+                await message.answer(f"Ваша ближайшая группа для встречи:\n" + "\n".join(names))    
+                
             else:
-                await message.answer("Ваша ближайшая пара пока не определена.")
-        session.close()
+                await message.answer("Ваша ближайшая группа пока не определена.")
 
     async def handle_exit(self, message: types.Message):
         await message.answer(
@@ -433,8 +442,10 @@ class FeedBackHandler(BaseHandler):
             )
             participant = result.scalars().first()
             if participant:
-                await session.delete(participant)
+                participant.active = False
+                session.add(participant)
                 await session.commit()
+
 
         await message.answer(
             "Вы вышли из участия. Возвращайтесь когда будете готовы!",
