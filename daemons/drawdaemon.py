@@ -182,15 +182,30 @@ async def refresh_participants_status(bot: Bot, session, chat_id: Union[int, str
 
     for p in participants:
         try:
+            member = await bot.get_chat_member(chat_id, p.tg_id)
             in_chat = await is_user_in_chat(bot, chat_id, p.tg_id)
+       
+
+            if not in_chat:
+                p.active = False
+                logger.info(f'Пользователь {p.name} (id={p.tg_id}) больше не в чате — деактивирован.')
+                if p.admin:
+                    p.admin = False
+                    logger.info(f'Пользователь {p.name} (id={p.tg_id}) вышел из чата и больше не админ.')
+                else:
+                    logger.info(f'Пользователь {p.name} (id={p.tg_id}) больше не в чате — деактивирован.')
+            else:
+                was_admin = p.admin
+                is_now_admin = member.status in ('administrator', 'creator')
+                if was_admin != is_now_admin:
+                    p.admin = is_now_admin
+                    if is_now_admin:
+                        logger.info(f'Пользователь {p.name} стал администратором — обновлено в БД.')
+                    else:
+                        logger.info(f'Пользователь {p.name} больше не администратор — обновлено в БД.')
         except Exception as e:
             logger.warning(f'Не удалось проверить участника {p.name} (id={p.tg_id}): {e}')
             continue
-
-        if not in_chat:
-            p.active = False
-            logger.info(f'Пользователь {p.name} (id={p.tg_id}) больше не в чате — деактивирован.')
-
     await session.commit()
 
 
@@ -224,10 +239,7 @@ async def perform_draw(bot: Bot, session, draw_date):
 #    if existing.scalars().first():
 #        logger.info(f'Жеребьёвка на дату {draw_date} уже проведена.')
 #        return None, []
-    try:
-        await refresh_participants_status(bot, session, CHAT_ID)
-    except Exception as e:
-        logger.warning(f'Ошибка при проверке участников в чате: {e}')
+    
     participants = await get_actual_participants(bot, session, CHAT_ID)
     if len(participants) < 2:
         logger.info('Недостаточно участников для жеребьёвки.')
@@ -280,7 +292,10 @@ async def daemon_loop(bot: Bot):
                 if not settings:
                     await asyncio.sleep(1800)
                     continue
-
+                try:
+                    await refresh_participants_status(bot, session, CHAT_ID)
+                except Exception as e:
+                    logger.warning(f'Ошибка при проверке участников в чате: {e}')
                 now = datetime.now()
                 logger.info(f'сейчас {now}')
 
@@ -316,7 +331,7 @@ async def daemon_loop(bot: Bot):
             except Exception as e:
                 logger.error(f'Ошибка в демоне жеребьёвки: {e}')
 
-        await asyncio.sleep(60)
+        await asyncio.sleep(120)
 
     logger.info('Демон жеребьёвки остановлен.')
 

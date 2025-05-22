@@ -3,6 +3,8 @@ import logging
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
+from aiogram.types import MenuButtonCommands
+
 
 from config import config
 from daemons.drawdaemon import daemon_loop, init_db
@@ -27,6 +29,8 @@ async def main():
     logger.info('Запуск основного приложения...')
     await init_db()
     bot = Bot(token=config.BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+
+    await bot.set_chat_menu_button(menu_button=MenuButtonCommands())
 
     await asyncio.gather(
         daemon_loop(bot),

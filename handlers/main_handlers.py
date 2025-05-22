@@ -15,11 +15,22 @@ from config import config
 from states.states import FeedBack
 from utils.lexicon import BUTTONS, text
 from utils.gdrive_utils import upload_file_to_drive
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+
 
 from users.models import (
     Participant, get_engine, get_session,
     Picture, Pair, Draw, Feedback
 )
+
+
+def build_keyboard(role: str) -> MainMenuRolleKeyboard:
+    return MainMenuRolleKeyboard(
+        keyboard=[
+            [KeyboardButton(text=btn)] for btn in BUTTONS[role]
+        ],
+        resize_keyboard=True
+    )
 
 
 class BaseHandler(Router):
@@ -157,7 +168,7 @@ class FeedBackHandler(BaseHandler):
             participant = result.scalars().first()
 
             if not participant:
-                await message.answer("Вы не зарегистрированы в системе.")
+                await message.answer("Ты не зарегистрирован в системе.",reply_markup=MainMenuRolleKeyboard(role='member').get_keyboard())
                 return
 
             result = await session.execute(
@@ -172,7 +183,7 @@ class FeedBackHandler(BaseHandler):
             pair_with_draw = result.first()
 
             if not pair_with_draw:
-                await message.answer("У вас не было встреч, чтобы оставить отзыв.")
+                await message.answer("У тебя не было встреч, чтобы оставить отзыв.", reply_markup=MainMenuRolleKeyboard(role='member').get_keyboard())
                 return
 
             pair, draw = pair_with_draw
@@ -185,7 +196,8 @@ class FeedBackHandler(BaseHandler):
 
             if feedback and feedback.success is not None:
                 await message.answer(
-                    "Вы уже оставили отзыв на последнюю встречу. Спасибо!"
+                    "Ты уже оставил отзыв на последнюю встречу. Спасибо!",
+                    reply_markup=MainMenuRolleKeyboard(role='member').get_keyboard()
                 )
                 return
 
@@ -221,7 +233,7 @@ class FeedBackHandler(BaseHandler):
 
             if message.text not in BUTTONS['first']:
                 await message.answer(
-                    "Пожалуйста, выберите один из предложенных вариантов."
+                    "Пожалуйста, выбери один из предложенных вариантов."
                 )
                 return
 
@@ -247,13 +259,14 @@ class FeedBackHandler(BaseHandler):
                                         participant_id=participant.id)
                 await message.answer(text=text['handle_feed'][1])
                 await state.set_state(FeedBack.waiting_for_skip_reason)
+            
 
     async def waiting_for_feedback(self,
                                    message: types.Message,
                                    state: FSMContext):
         if message.text not in BUTTONS['positive']:
             await message.answer(
-                "Пожалуйста, выберите одну из предложенных оценок."
+                "Пожалуйста, выбери одну из предложенных оценок."
             )
             return
 
@@ -272,7 +285,8 @@ class FeedBackHandler(BaseHandler):
         participant_id = data.get('participant_id')
 
         if not draw_id or not participant_id:
-            await message.answer("Произошла ошибка. Попробуйте снова позже.")
+            await message.answer("Произошла ошибка. Попробуй снова позже.",
+                                 reply_markup=MainMenuRolleKeyboard(role='member').get_keyboard())
             await state.clear()
             return
 
@@ -284,7 +298,8 @@ class FeedBackHandler(BaseHandler):
             feedback = result.scalars().first()
 
             if not feedback:
-                await message.answer("Не удалось найти отзыв. Попробуйте ещё раз.")
+                await message.answer("Не удалось найти отзыв. Попробуй ещё раз.",
+                                     reply_markup=MainMenuRolleKeyboard(role='member').get_keyboard())
                 await state.clear()
                 return
 
@@ -346,9 +361,11 @@ class FeedBackHandler(BaseHandler):
                 folder_id=folder_id
             )
             drive_link = f"https://drive.google.com/file/d/{gdrive_file_id}/view"
-            await message.answer(f"Файл загружен локально и на Google Drive:\n{drive_link}")
+            await message.answer(f"Файл загружен локально и на Google Drive:\n{drive_link}",
+                                 reply_markup=MainMenuRolleKeyboard(role='member').get_keyboard())
         except Exception as e:
-            await message.answer(f"Файл сохранён локально, но не удалось загрузить на Google Drive.\nОшибка: {html.escape(str(e))}")
+            await message.answer(f"Файл сохранён локально, но не удалось загрузить на Google Drive.\nОшибка: {html.escape(str(e))}",
+                                 reply_markup=MainMenuRolleKeyboard(role='member').get_keyboard())
 
         await message.answer(
             text=text['handle_media'],
@@ -372,17 +389,17 @@ class FeedBackHandler(BaseHandler):
 
             if message.text == BUTTONS['regular'][0]:
                 participant.frequency_individual = 2
-                response = 'Вы установили 1 раз в 2 недели'
+                response = 'Ты установил 1 раз в 2 недели'
             elif message.text == BUTTONS['regular'][1]:
                 participant.frequency_individual = 3
-                response = 'Вы установили 1 раз в 3 недели'
+                response = 'Ты установил 1 раз в 3 недели'
             else:
                 participant.frequency_individual = 4
-                response = 'Вы установили 1 раз в 4 недели'
+                response = 'Ты установил 1 раз в 4 недели'
 
             await session.commit()
 
-        await message.answer(text=response)
+        await message.answer(text=response, reply_markup=MainMenuRolleKeyboard(role='member').get_keyboard())
 
     async def handle_view_notifications(self, message: types.Message):
         await message.answer(text=text['handle_view_notifications'])
@@ -395,7 +412,8 @@ class FeedBackHandler(BaseHandler):
             participant = result.scalars().first()
 
             if not participant:
-                await message.answer("Вы ещё не участвуете в жеребьёвках.")
+                await message.answer("Ты ещё не участвовал в жеребьёвках.",
+                                     reply_markup=MainMenuRolleKeyboard(role='member').get_keyboard())
                 return
 
             result = await session.execute(
@@ -422,10 +440,12 @@ class FeedBackHandler(BaseHandler):
                 )
                 participants = result.scalars().all()
                 names = [p.name for p in participants]
-                await message.answer(f"Ваша ближайшая группа для встречи:\n" + "\n".join(names))    
+                await message.answer(f"Твоя ближайшая группа для встречи:\n" + "\n".join(names),
+                                     reply_markup=MainMenuRolleKeyboard(role='member').get_keyboard())    
                 
             else:
-                await message.answer("Ваша ближайшая группа пока не определена.")
+                await message.answer("Твоя ближайшая группа пока не определена.",
+                                     reply_markup=MainMenuRolleKeyboard(role='member').get_keyboard())
 
     async def handle_exit(self, message: types.Message):
         await message.answer(
@@ -448,12 +468,12 @@ class FeedBackHandler(BaseHandler):
 
 
         await message.answer(
-            "Вы вышли из участия. Возвращайтесь когда будете готовы!",
+            "Ты вышел из участия. Возвращайся когда будете готовы!",
             reply_markup=types.ReplyKeyboardRemove()
         )
 
     async def cancel_exit(self, message: types.Message):
         await message.answer(
-            "Рады, что вы остаетесь с нами 😊",
+            "Рад, что ты остаешься с нами 😊",
             reply_markup=MainMenuRolleKeyboard(role='member').get_keyboard()
         )

@@ -5,7 +5,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import FSInputFile
 from dotenv import load_dotenv
 
-from handlers.main_handlers import BaseHandler
+from handlers.main_handlers import BaseHandler, MainMenuRolleKeyboard
 from states.admins import AddUser
 from utils.handler_util import (
     async_add_user,
@@ -68,10 +68,12 @@ class AdminHandler(BaseHandler):
             await message.reply(
                 f"Пользователь успешно добавлен:\n"
                 f"ID: {user_id}\n"
-                f"Имя: {name}"
+                f"Имя: {name}",
+                reply_markup=MainMenuRolleKeyboard(role='admin').get_keyboard()
             )
         else:
-            await message.reply("Произошла ошибка при добавлении пользователя.")
+            await message.reply("Произошла ошибка при добавлении пользователя.",
+                                reply_markup=MainMenuRolleKeyboard(role='admin').get_keyboard())
         await state.clear()
 
     async def delete_user_button_handler(self, message: types.Message, state: FSMContext):
@@ -91,10 +93,12 @@ class AdminHandler(BaseHandler):
             with open(filepath, "wb") as f:
                 f.write(stream.read())
             file_to_send = FSInputFile(path=filepath)
-            await message.answer_document(file_to_send, caption="Вот отчет по жеребьевкам")
+            await message.answer_document(file_to_send, caption="Вот отчет по жеребьевкам",
+                                          reply_markup=MainMenuRolleKeyboard(role='admin').get_keyboard())
 
         except Exception as e:
-            await message.reply(f"Произошла ошибка при формировании отчета: {e}")
+            await message.reply(f"Произошла ошибка при формировании отчета: {e}",
+                                reply_markup=MainMenuRolleKeyboard(role='admin').get_keyboard())
 
     async def process_delete_user_id(self, message: types.Message, state: FSMContext):
         """Обработчик удаления пользователя"""
@@ -105,9 +109,11 @@ class AdminHandler(BaseHandler):
             return
         success = await async_delete_user(user_id)
         if success:
-            await message.reply(f"Пользователь с ID {user_id} успешно удален")
+            await message.reply(f"Пользователь с ID {user_id} успешно удален",
+                                reply_markup=MainMenuRolleKeyboard(role='admin').get_keyboard())
         else:
-            await message.reply("Пользователь с таким ID не найден")
+            await message.reply("Пользователь с таким ID не найден",
+                                reply_markup=MainMenuRolleKeyboard(role='admin').get_keyboard())
         await state.clear()
 
     async def list_users_button_handler(self, message: types.Message):
@@ -119,9 +125,11 @@ class AdminHandler(BaseHandler):
                 status = "Активен" if user.active else "Неактивен"
                 admin_tag = ", админ" if user.admin else ""
                 user_lines.append(f"ID: {user.tg_id}, Имя: {user.name} ({status}{admin_tag})")
-            await message.reply(f"Список участников:\n" + "\n".join(user_lines))
+            await message.reply(f"Список участников:\n" + "\n".join(user_lines),
+                                reply_markup=MainMenuRolleKeyboard(role='admin').get_keyboard())
         else:
-            await message.reply("Список участников пуст")
+            await message.reply("Список участников пуст",
+                                reply_markup=MainMenuRolleKeyboard(role='admin').get_keyboard())
 
     async def regular_pairing_handler(self, message: types.Message, state: FSMContext):
         """Обработчик кнопки регулярности участия"""
@@ -143,9 +151,11 @@ class AdminHandler(BaseHandler):
             return
         success = await async_update_frequency(frequency)
         if success:
-            await message.reply(f"Частота формирования пар успешно установлена: раз в {frequency} неделю(ю).")
+            await message.reply(f"Частота формирования пар успешно установлена: раз в {frequency} неделю(ю).",
+                                reply_markup=MainMenuRolleKeyboard(role='admin').get_keyboard())
         else:
-            await message.reply("Ошибка при обновлении настроек.")
+            await message.reply("Ошибка при обновлении настроек.",
+                                reply_markup=MainMenuRolleKeyboard(role='admin').get_keyboard())
         await state.clear()
 
     async def pause_user_button_handler(self, message: types.Message, state: FSMContext):
@@ -195,7 +205,9 @@ class AdminHandler(BaseHandler):
             return
         success = await async_set_user_pause(tg_id, pause_start, pause_end)
         if success:
-            await message.reply(f"Участник с ID {tg_id} успешно приостановлен с {pause_start} по {pause_end}.")
+            await message.reply(f"Участник с ID {tg_id} успешно приостановлен с {pause_start} по {pause_end}.",
+                                reply_markup=MainMenuRolleKeyboard(role='admin').get_keyboard())
         else:
-            await message.reply("Участник с таким ID не найден.")
+            await message.reply("Участник с таким ID не найден.",
+                                reply_markup=MainMenuRolleKeyboard(role='admin').get_keyboard())
         await state.clear()
