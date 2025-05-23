@@ -152,7 +152,7 @@ class AdminHandler(BaseHandler):
             return
         success = await async_update_frequency(frequency)
         if success:
-            await message.reply(f"Частота формирования пар успешно установлена: раз в {frequency} неделю(ю).",
+            await message.reply(f"Частота формирования пар успешно установлена: раз в {frequency} неделю(и).",
                                 reply_markup=MainMenuRolleKeyboard(role='admin').get_keyboard())
         else:
             await message.reply("Ошибка при обновлении настроек.",

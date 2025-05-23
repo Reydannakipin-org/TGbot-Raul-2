@@ -141,7 +141,8 @@ class FeedBackHandler(BaseHandler):
                            self.handle_feedback)
         self.state_handler(FeedBack.negative_answer,
                            self.handle_feedback)
-
+        self.message_handler(F.text == 'Возобновить встречи',
+                             self.handle_restart_draw)
         self.message_handler(F.text == 'Отправка фото',
                              self.handle_ask_for_media)
         self.message_handler(F.photo, self.handle_media)
@@ -258,7 +259,7 @@ class FeedBackHandler(BaseHandler):
                 await state.update_data(draw_id=draw.id,
                                         participant_id=participant.id)
                 await message.answer(text=text['handle_feed'][1])
-                await state.set_state(FeedBack.waiting_for_skip_reason)
+                await state.set_state(FeedBack.waiting_for_suggestions)
             
 
     async def waiting_for_feedback(self,
@@ -471,12 +472,31 @@ class FeedBackHandler(BaseHandler):
 
 
         await message.answer(
-            "Ты вышел из участия. Возвращайся когда будете готовы!",
+            "Ты вышел из участия. Возвращайся когда будешь готов!",
             reply_markup=types.ReplyKeyboardRemove()
         )
 
     async def cancel_exit(self, message: types.Message):
         await message.answer(
             "Рад, что ты остаешься с нами 😊",
+            reply_markup=MainMenuRolleKeyboard(role='member').get_keyboard()
+        )
+
+    async def handle_restart_draw(self, message: types.Message):
+        user_id = str(message.from_user.id)
+        engine = get_engine()
+        async with get_session(engine) as session:
+            result = await session.execute(
+                select(Participant).filter_by(tg_id=user_id)
+            )
+            participant = result.scalars().first()
+            if participant:
+                participant.active = True
+                session.add(participant)
+                await session.commit()
+
+
+        await message.answer(
+            "Ты снова в деле 😊",
             reply_markup=MainMenuRolleKeyboard(role='member').get_keyboard()
         )
