@@ -52,8 +52,8 @@ def handle_shutdown():
 
 
 def match_pairs(participants, previous_pairs):
-    import collections
-
+    previous_set = set((min(a, b), max(a, b)) for a, b in previous_pairs)
+    
     id_map = {p.id: p for p in participants}
     ids = list(id_map.keys())
     random.shuffle(ids)
@@ -83,9 +83,21 @@ def match_pairs(participants, previous_pairs):
 
     leftovers = [id_map[i] for i in unmatched]
     for lone in leftovers:
-        candidates = [pair for pair in pairs if len(pair) < 3]
+        candidates = []
+        for pair in pairs:
+            if len(pair) >= 3:
+                continue
+            id_pair = [p.id for p in pair]
+            conflict = False
+            for pid in id_pair:
+                if (min(lone.id, pid), max(lone.id, pid)) in previous_set:
+                    conflict = True
+                    break
+            if not conflict:
+                candidates.append(pair)
         if candidates:
-            random.choice(candidates).append(lone)
+            chosen = random.choice(candidates)
+            chosen.append(lone)
             logger.info(f"Участник {lone.name} добавлен третьим в пару.")
         else:
             logger.info(f"Участник {lone.name} остался без пары.")
@@ -99,7 +111,7 @@ async def get_or_create_cycle(session, actual_participants):
     if total_possible == 0:
         return None
     result = await session.execute(
-        select(Pair).join(Draw).join(Cycle).order_by(Cycle.start_date.desc())
+        select(Pair).join(Draw).join(Cycle).order_by(Cycle.id.desc())
     )
     previous_pairs = result.scalars().all()
 
@@ -114,14 +126,14 @@ async def get_or_create_cycle(session, actual_participants):
             for j in range(i + 1, len(filtered_ids)):
                 unique_pairs.add(tuple(sorted((filtered_ids[i], filtered_ids[j]))))
 
-    if len(unique_pairs) / total_possible >= 0.75:
-        logger.info("75% возможных пар среди текущих участников реализовано — создаём новый цикл жеребьёвки.")
+    if len(unique_pairs) / total_possible >= 0.9:
+        logger.info("90% возможных пар среди текущих участников реализовано — создаём новый цикл жеребьёвки.")
         new_cycle = Cycle(start_date=datetime.now().date())
         session.add(new_cycle)
         await session.commit()
         return new_cycle 
     
-    result = await session.execute(select(Cycle).order_by(Cycle.start_date.desc()))
+    result = await session.execute(select(Cycle).order_by(Cycle.id.desc()))
     current_cycle = result.scalars().first()
     if not current_cycle:
         current_cycle = Cycle(start_date=datetime.now().date())
@@ -148,6 +160,12 @@ async def get_actual_participants(bot: Bot, session, chat_id: Union[int, str]):
     actual = []
 
     for p in participants:
+        if p.exclude_start and p.exclude_end:
+            if p.exclude_start <= today <= p.exclude_end:
+                logger.info(
+                    f'Участник {p.name} исключён из участия в жеребьёвке до {p.exclude_end}.'
+                )
+                continue
         if await is_user_in_chat(bot, chat_id, p.tg_id):
             result = await session.execute(
                 select(Draw.draw_date).join(Pair).filter(
@@ -258,7 +276,13 @@ async def perform_draw(bot: Bot, session, draw_date):
         previous_set.add((p.participant1_id, p.participant2_id))
         previous_set.add((p.participant2_id, p.participant1_id))
 
-    pairs = match_pairs(participants, previous_set)
+    
+    pairs = []
+    for attempt in range(7):
+        pairs = match_pairs(participants, previous_set)
+        if pairs:
+            logger.info(f'Успешно подобраны пары с {attempt + 1}-й попытки.')
+        break
 
     if not pairs:
         logger.info('Нет новых возможных пар. Пробуем fallback жеребьёвку.')

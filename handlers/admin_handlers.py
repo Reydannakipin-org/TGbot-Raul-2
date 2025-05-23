@@ -124,7 +124,8 @@ class AdminHandler(BaseHandler):
             for user in users:
                 status = "Активен" if user.active else "Неактивен"
                 admin_tag = ", админ" if user.admin else ""
-                user_lines.append(f"ID: {user.tg_id}, Имя: {user.name} ({status}{admin_tag})")
+                freq_info = f", Инд. частота: {user.frequency_individual} нед."
+                user_lines.append(f"ID: {user.tg_id}, Имя: {user.name} ({status}{admin_tag}) {freq_info}")
             await message.reply(f"Список участников:\n" + "\n".join(user_lines),
                                 reply_markup=MainMenuRolleKeyboard(role='admin').get_keyboard())
         else:

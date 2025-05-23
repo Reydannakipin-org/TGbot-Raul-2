@@ -387,12 +387,15 @@ class FeedBackHandler(BaseHandler):
             )
             participant = result.scalars().first()
 
-            if message.text == BUTTONS['regular'][0]:
+            if message.text == BUTTONS['regular'][1]:
                 participant.frequency_individual = 2
                 response = 'Ты установил 1 раз в 2 недели'
-            elif message.text == BUTTONS['regular'][1]:
+            elif message.text == BUTTONS['regular'][2]:
                 participant.frequency_individual = 3
                 response = 'Ты установил 1 раз в 3 недели'
+            elif message.text == BUTTONS['regular'][0]:
+                participant.frequency_individual = 1
+                response = 'Ты установил раз в неделю'
             else:
                 participant.frequency_individual = 4
                 response = 'Ты установил 1 раз в 4 недели'
