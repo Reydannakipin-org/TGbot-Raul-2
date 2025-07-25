@@ -15,7 +15,7 @@ from aiogram.exceptions import TelegramBadRequest
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from users.models import (
+from db.models import (
     get_engine,
     Draw, Pair, Settings,
     Participant, Cycle
@@ -26,17 +26,17 @@ load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHAT_ID = int(os.getenv("CHAT_ID"))
 
-# Логирование в консоль и в файл
+# Logging
 log_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-# Консоль
+# Console handler
 console_handler = logging.StreamHandler()
 console_handler.setFormatter(log_formatter)
 logger.addHandler(console_handler)
 
-# Файл
+# File handler
 file_handler = logging.FileHandler('drawdaemon.log', encoding='utf-8')
 file_handler.setFormatter(log_formatter)
 logger.addHandler(file_handler)
@@ -252,7 +252,7 @@ async def save_draw(session, draw_date, current_cycle, pairs):
 
 
 async def perform_draw(bot: Bot, session, draw_date):
-    # Проверка существующей жеребьёвки закомментировать для теста
+    # Checking for existing drow for today
 #    existing = await session.execute(select(Draw).filter_by(draw_date=draw_date))
 #    if existing.scalars().first():
 #        logger.info(f'Жеребьёвка на дату {draw_date} уже проведена.')

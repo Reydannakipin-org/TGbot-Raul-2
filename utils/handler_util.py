@@ -2,13 +2,13 @@
 from datetime import date
 from sqlalchemy.future import select
 
-from database.db import get_async_engine, get_async_sessionmaker
-from users.models import Participant, Settings
+from db.models import get_engine, get_session
+from db.models import Participant, Settings
 
 
 async def async_add_user(user_id: int, name: str) -> str:
-    engine = get_async_engine()
-    async_session = get_async_sessionmaker(engine)
+    engine = get_engine()
+    async_session = get_session(engine)
     async with async_session() as session:
         result = await session.execute(select(Participant).where(Participant.tg_id == str(user_id)))
         existing_user = result.scalar_one_or_none()
@@ -21,8 +21,8 @@ async def async_add_user(user_id: int, name: str) -> str:
 
 
 async def async_delete_user(user_id: int) -> bool:
-    engine = get_async_engine()
-    async_session = get_async_sessionmaker(engine)
+    engine = get_engine()
+    async_session = get_session(engine)
     async with async_session() as session:
         result = await session.execute(select(Participant).where(Participant.tg_id == str(user_id)))
         user = result.scalar_one_or_none()
@@ -34,8 +34,8 @@ async def async_delete_user(user_id: int) -> bool:
 
 
 async def async_list_users() -> list:
-    engine = get_async_engine()
-    async_session = get_async_sessionmaker(engine)
+    engine = get_engine()
+    async_session = get_session(engine)
     async with async_session() as session:
         result = await session.execute(select(Participant))
         users = result.scalars().all()
@@ -43,8 +43,8 @@ async def async_list_users() -> list:
 
 
 async def async_update_frequency(frequency: int) -> bool:
-    engine = get_async_engine()
-    async_session = get_async_sessionmaker(engine)
+    engine = get_engine()
+    async_session = get_session(engine)
     async with async_session() as session:
         result = await session.execute(select(Settings))
         settings = result.scalar_one_or_none()
@@ -59,8 +59,8 @@ async def async_update_frequency(frequency: int) -> bool:
 
 
 async def async_set_user_pause(tg_id: int, pause_start: date, pause_end: date) -> bool:
-    engine = get_async_engine()
-    async_session = get_async_sessionmaker(engine)
+    engine = get_engine()
+    async_session = get_session(engine)
     async with async_session() as session:
         result = await session.execute(select(Participant).where(Participant.tg_id == str(tg_id)))
         user = result.scalar_one_or_none()
