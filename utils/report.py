@@ -4,7 +4,7 @@ from openpyxl import Workbook
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from users.models import get_engine, get_session, Draw, Feedback, Pair
+from db.models import get_engine, get_session, Draw, Feedback, Pair
 
 
 async def generate_report_file() -> BytesIO:

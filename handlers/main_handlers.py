@@ -18,7 +18,7 @@ from utils.gdrive_utils import upload_file_to_drive
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 
 
-from users.models import (
+from db.models import (
     Participant, get_engine, get_session,
     Picture, Pair, Draw, Feedback
 )

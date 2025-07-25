@@ -43,12 +43,12 @@ class AdminHandler(BaseHandler):
         self.state_handler(AddUser.waiting_for_pause_end_date, self.process_pause_end_date)
 
     async def add_user_button_handler(self, message: types.Message, state: FSMContext):
-        """Обработчик кнопки добавления пользователя"""
+        """For button add user"""
         await message.reply("Пожалуйста, введи ID пользователя:")
         await state.set_state(AddUser.waiting_for_user_id)
 
     async def process_user_id(self, message: types.Message, state: FSMContext):
-        """Обработчик добавления пользователя"""
+        """for user adding"""
         try:
             user_id = int(message.text)
             await message.reply("Теперь введи полное имя пользователя:")
@@ -77,12 +77,12 @@ class AdminHandler(BaseHandler):
         await state.clear()
 
     async def delete_user_button_handler(self, message: types.Message, state: FSMContext):
-        """Обработчик кнопки удаления пользователя"""
+        """Handler for button delete user"""
         await message.reply("Пожалуйста, введи ID пользователя для удаления:")
         await state.set_state(AddUser.waiting_for_delete_user_id)
 
     async def export_report_handler(self, message: types.Message):
-        """Обработчик кнопки 'Выгрузить отчет' — вызывает генератор Excel и отправляет файл"""
+        """handler for generating report in xls"""
 
         try:
             stream = await generate_report_file()
@@ -101,7 +101,7 @@ class AdminHandler(BaseHandler):
                                 reply_markup=MainMenuRolleKeyboard(role='admin').get_keyboard())
 
     async def process_delete_user_id(self, message: types.Message, state: FSMContext):
-        """Обработчик удаления пользователя"""
+        """Handler of user deliting"""
         try:
             user_id = int(message.text)
         except ValueError:
@@ -117,7 +117,7 @@ class AdminHandler(BaseHandler):
         await state.clear()
 
     async def list_users_button_handler(self, message: types.Message):
-        """Обработчик кнопки просмотра списка пользователей"""
+        """Handler for button list of users"""
         users = await async_list_users()
         if users:
             user_lines = []
@@ -133,7 +133,7 @@ class AdminHandler(BaseHandler):
                                 reply_markup=MainMenuRolleKeyboard(role='admin').get_keyboard())
 
     async def regular_pairing_handler(self, message: types.Message, state: FSMContext):
-        """Обработчик кнопки регулярности участия"""
+        """Handler for button frequency of dating"""
         await message.reply(
             "Пожалуйста, введи желаемую частоту формирования пар (в неделях, допустимые значения: 1, 2, 3 или 4):"
         )
