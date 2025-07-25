@@ -46,12 +46,14 @@ engine = get_engine()
 
 
 def handle_shutdown():
+    """Signal handler to stop the draw daemon gracefully."""
     global should_run
     logger.info('Остановка демона жеребьёвки...')
     should_run = False
 
 
 def match_pairs(participants, previous_pairs):
+    """Generate unique pairs of participants avoiding previous combinations."""
     previous_set = set((min(a, b), max(a, b)) for a, b in previous_pairs)
     
     id_map = {p.id: p for p in participants}
@@ -106,6 +108,7 @@ def match_pairs(participants, previous_pairs):
 
 
 async def get_or_create_cycle(session, actual_participants):
+    """Get cycle number or create new with check"""
     total_possible = len(actual_participants) * (len(actual_participants) - 1) // 2
 
     if total_possible == 0:
@@ -143,6 +146,7 @@ async def get_or_create_cycle(session, actual_participants):
     return current_cycle
 
 async def is_user_in_chat(bot: Bot, chat_id: Union[int, str], user_id: int) -> bool:
+    """User in group check"""
     try:
         member: ChatMember = await bot.get_chat_member(chat_id, user_id)
         return member.status in ('member', 'administrator', 'creator')
@@ -151,6 +155,7 @@ async def is_user_in_chat(bot: Bot, chat_id: Union[int, str], user_id: int) -> b
 
 
 async def get_actual_participants(bot: Bot, session, chat_id: Union[int, str]):
+    """Select active participants for the draw"""
     today = datetime.now().date()
     now = datetime.now()
     participants = (await session.execute(
@@ -194,6 +199,7 @@ async def get_actual_participants(bot: Bot, session, chat_id: Union[int, str]):
     return actual
 
 async def refresh_participants_status(bot: Bot, session, chat_id: Union[int, str]):
+    """Check, which staus of participants now"""
     participants = (await session.execute(
         select(Participant).where(Participant.active == True)
     )).scalars().all()
@@ -252,6 +258,7 @@ async def save_draw(session, draw_date, current_cycle, pairs):
 
 
 async def perform_draw(bot: Bot, session, draw_date):
+    """Main draw function"""
     # Checking for existing drow for today
 #    existing = await session.execute(select(Draw).filter_by(draw_date=draw_date))
 #    if existing.scalars().first():
@@ -299,6 +306,7 @@ async def perform_draw(bot: Bot, session, draw_date):
 
 
 async def daemon_loop(bot: Bot):
+    """Main daemon"""
     global should_run
     logger.info('Запуск демона жеребьёвки...')
 
@@ -361,6 +369,7 @@ async def daemon_loop(bot: Bot):
 
 
 async def init_db():
+    """Initial datebase start and initial settings check"""
     async with async_sessionmaker(bind=engine, expire_on_commit=False)() as session:
         result = await session.execute(select(Settings))
         settings = result.scalars().first()
